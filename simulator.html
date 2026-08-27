@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>대기 안정도 & 구름 생성 시뮬레이터</title>
+<style>
+  :root{
+    --bg:#f3f4f6;
+    --panel:#ffffff;
+    --accent:#06b6d4;
+    --muted:#475569;
+    --card:#f8fafc;
+    --glass: rgba(15,23,42,0.03);
+    --text:#111827;
+    --line:#111827;
+    --border: rgba(15,23,42,0.14);
+  }
+  *{box-sizing:border-box;font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;color:var(--text)}
+  html,body{height:100%;margin:0;background:linear-gradient(180deg,#eef2f7 0%, #f8fafc 60%);padding:18px}
+  .app{display:flex;flex-direction:row;gap:18px;max-width:1200px;margin:0 auto}
+  @media (max-width:900px){.app{flex-direction:column;padding-bottom:24px}}
+  .left, .right{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;box-shadow:0 6px 18px rgba(15,23,42,0.08)}
+  .left{flex:1;min-width:480px}
+  .right{width:420px;display:flex;flex-direction:column;gap:12px}
+  .title{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+  .title h1{font-size:16px;margin:0;font-weight:600;color:var(--text)}
+  .controls{background:var(--glass);padding:12px;border-radius:10px;display:flex;flex-direction:column;gap:10px}
+  label{font-size:13px;color:var(--muted);display:flex;justify-content:space-between;align-items:center}
+  .row{display:flex;gap:8px;align-items:center}
+  input[type="range"]{width:100%}
+  input[type="number"]{width:84px;padding:6px;border-radius:8px;border:1px solid var(--border);background:#fff;color:var(--text)}
+  .small{font-size:12px;color:var(--muted)}
+  canvas{width:100%;height:560px;border-radius:8px;background:linear-gradient(180deg,rgba(255,255,255,0.18),rgba(255,255,255,0.06));border:1px solid rgba(15,23,42,0.08)}
+  .statCard{padding:12px;border-radius:10px;background:linear-gradient(180deg, rgba(148,163,184,0.04), rgba(255,255,255,0.02));display:flex;flex-direction:column;gap:10px}
+  .compareCard{padding:12px;border-radius:12px;background:linear-gradient(180deg,#fffdfd, rgba(255,255,255,0.8));border:1px solid rgba(244,114,182,0.3);display:block}
+  .compareHeader{display:flex;justify-content:space-between;align-items:center;font-weight:700;margin-bottom:8px}
+  .compareBadge{padding:4px 8px;border-radius:999px;background:#fce7f3;color:#be185d;font-size:11px;font-weight:700}
+  .feedbackBox{padding:12px;border-radius:10px;border:1px solid rgba(245,158,11,0.5);background:linear-gradient(180deg,#fff7ed,#fff);color:#422006}
+  .feedbackBox h4{margin:0 0 8px;font-size:15px;color:#b45309}
+  .feedbackBox p{margin:0 0 8px;line-height:1.5;font-size:13px;color:#422006}
+  .feedbackBox ul{margin:0;padding-left:18px;line-height:1.7;font-size:12px;color:#422006}
+  .bigVal{font-size:20px;font-weight:700;color:var(--text)}
+  .verdict{font-weight:700;padding:8px;border-radius:8px;text-align:center}
+  .stable{background:#063f2d;color:#9ff6d4}
+  .unstable{background:#3b0521;color:#ffb6c1}
+  .conditional{background:#2a2b46;color:#bcd0ff}
+  .cloudCanvas{height:300px;border-radius:8px;background:linear-gradient(180deg,#071220,#022034);display:block}
+  .legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+  .legend .item{display:flex;gap:6px;align-items:center;font-size:12px;color:var(--muted)}
+  .swatch{width:14px;height:8px;border-radius:2px}
+  .btnRow{display:flex;gap:8px;align-items:center}
+  .btn{padding:8px 12px;border-radius:8px;background:linear-gradient(90deg,var(--accent),#7dd3fc);border:none;color:#002;cursor:pointer;font-weight:700}
+  .btn.secondary{background:linear-gradient(90deg,#e2e8f0,#cbd5e1);color:#0f172a}
+  .tabBar{display:flex;gap:8px;margin:10px 0 8px}
+  .tab{flex:1;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:#f8fafc;color:var(--text);font-weight:600;cursor:pointer}
+  .tab.active{background:#111827;color:#fff;border-color:#111827}
+  .tabPanel{display:none}
+  .tabPanel.active{display:block}
+  .revisionBox{padding:12px;border-radius:10px;border:1px solid rgba(15,23,42,0.08);background:#f8fafc}
+  .revisionBox h4{margin:0 0 8px;font-size:15px}
+  .revisionBox p{margin:0 0 8px;line-height:1.5;font-size:13px;color:var(--muted)}
+  .revisionBox textarea{width:100%;min-height:90px;border:1px solid var(--border);border-radius:8px;padding:10px;resize:vertical;background:#fff;color:var(--text)}
+  .revisionSummary{margin-top:10px;padding:10px;border-radius:8px;background:#ecfeff;border:1px solid rgba(6,182,212,0.2);color:#0f172a;font-size:12px;line-height:1.5}
+  .revisionList{margin:10px 0 0;padding-left:18px;line-height:1.7;font-size:12px;color:var(--muted)}
+  .footer{font-size:12px;color:var(--muted);text-align:center;margin-top:8px}
+  a.link{color:var(--accent);text-decoration:none}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="left">
+    <div class="title">
+      <h1>단열선도 (T - 높이)</h1>
+      <div class="small">세로: 높이 0–4,000 m, 가로: 온도 -20°C–40°C</div>
+    </div>
+
+    <canvas id="skewCanvas" width="800" height="560"></canvas>
+    <div class="legend">
+      <div class="item"><span class="swatch" style="background:#ffffff;border:1px solid rgba(0,0,0,0.15)"></span> 주변 기온 (Ambient)</div>
+      <div class="item"><span class="swatch" style="background:red"></span> 건조 단열선 (Dry adiabat)</div>
+      <div class="item"><span class="swatch" style="background:blue"></span> 습윤 단열선 (Moist adiabat)</div>
+      <div class="item"><span class="swatch" style="background:#27ae60"></span> 이슬점 감률 (Dewpoint)</div>
+    </div>
+  </div>
+
+  <div class="right">
+    <div class="statCard controls">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div class="small">지구과학 교육 시뮬레이터</div>
+          <div style="font-weight:700">대기 안정도와 구름 생성</div>
+        </div>
+        <div class="small">2022 개정</div>
+      </div>
+
+      <label>지표면 기온 T (°C)
+        <div class="row" style="width:100%">
+          <input id="T" type="range" min="0" max="40" step="0.5" value="30">
+          <input id="Tnum" type="number" min="0" max="40" step="0.5" value="30">
+        </div>
+      </label>
+
+      <label>지표면 이슬점 Td (°C)
+        <div class="row" style="width:100%">
+          <input id="Td" type="range" min="-10" max="30" step="0.5" value="20">
+          <input id="Tdnum" type="number" min="-10" max="30" step="0.5" value="20">
+        </div>
+        <div class="small">항상 Td ≤ T로 유지됩니다.</div>
+      </label>
+
+      <div style="display:flex;gap:8px;align-items:center;justify-content:space-between">
+        <div style="font-size:13px;color:var(--muted)">주변 대기 기온 (0m~4000m)</div>
+        <button id="resetProfile" class="btn" style="padding:6px 8px;font-size:12px">기본값</button>
+      </div>
+
+      <div id="envSliders" style="display:flex;flex-direction:column;gap:8px">
+        <!-- sliders for 0,1k,2k,3k,4k -->
+      </div>
+
+      <div class="btnRow">
+        <button id="updateBtn" class="btn">그래프 갱신</button>
+        <button id="animateBtn" class="btn" style="background:linear-gradient(90deg,#ffb86b,#ff7a7a)">애니메이션 재생</button>
+      </div>
+    </div>
+
+    <div class="statCard">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div class="small">계산 결과</div>
+          <div>LCL 고도: <span id="lclVal" class="bigVal">-- m</span></div>
+        </div>
+        <div>
+          <div class="small">대기 판정</div>
+          <div id="stability" class="verdict conditional">--</div>
+        </div>
+      </div>
+
+      <div style="margin-top:6px" class="small">대기 감률 비교: 건조=10°C/km, 습윤=5°C/km</div>
+    </div>
+
+    <div class="statCard">
+      <div class="small">학생 답 입력</div>
+      <label style="margin-top:8px">학생 LCL 고도 (m)
+        <input id="studentLCL" type="number" min="0" max="4000" step="10" value="1250" style="width:100%;margin-top:6px">
+      </label>
+      <label style="margin-top:8px">학생 LCL 온도 (°C)
+        <input id="studentLCLTemp" type="number" min="-20" max="40" step="0.1" value="17.5" style="width:100%;margin-top:6px">
+      </label>
+      <button id="saveStudentAnswer" class="btn" style="margin-top:10px;padding:8px 10px">학생 답 반영</button>
+    </div>
+
+    <div class="compareCard">
+      <div class="compareHeader">
+        <span>오류 원인 찾기</span>
+        <span class="compareBadge">학생 체크</span>
+      </div>
+
+      <div class="tabBar">
+        <button class="tab active" data-tab="check">오답 확인</button>
+        <button class="tab" data-tab="revise">다시 수정</button>
+      </div>
+
+      <div id="panel-check" class="tabPanel active">
+        <div class="feedbackBox">
+          <h4 id="feedbackTitle">학생이 확인할 점</h4>
+          <p id="feedbackText">LCL은 지표면 온도와 이슬점 차이에 따라 결정됩니다. 먼저 T와 Td의 차이를 확인하고, 건조 단열선이 포화 상태에 도달하는 지점을 찾으세요.</p>
+          <ul id="feedbackList">
+            <li>지표면 온도 T와 이슬점 Td의 차이를 계산해 보세요.</li>
+            <li>LCL은 보통 125 × (T - Td) m로 구합니다.</li>
+            <li>LCL 아래는 건조 단열선, 위에는 습윤 단열선을 적용합니다.</li>
+            <li>오답이 나왔다면, 어느 단계에서 계산이 틀렸는지 순서대로 다시 확인해 보세요.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div id="panel-revise" class="tabPanel">
+        <div class="revisionBox">
+          <h4>오개념을 고치고 다시 써보기</h4>
+          <p>내가 틀린 이유를 한 문장으로 적고, 정답 계산 과정을 다시 써보세요.</p>
+          <textarea id="selfRevisionInput" placeholder="예: 나는 T - Td를 잘못 계산해서 LCL 높이가 너무 커졌어요. 다음에는 T와 Td의 차이를 먼저 계산한 뒤, 125를 곱해 LCL을 구하겠습니다."></textarea>
+          <div class="btnRow" style="margin-top:10px">
+            <button id="saveRevisionBtn" class="btn">수정 내용 저장</button>
+            <button id="resetRevisionBtn" class="btn secondary">초기화</button>
+          </div>
+          <div id="revisionSummary" class="revisionSummary">아직 수정 내용을 적지 않았습니다. 틀린 이유와 다시 계산하는 방법을 적어보세요.</div>
+          <ul class="revisionList">
+            <li>처음으로 어떤 값이 틀렸는지 적어 보세요.</li>
+            <li>다음 번에는 T와 Td 차이 계산 순서를 다시 써보세요.</li>
+            <li>LCL은 어디에서 시작하는지 다시 설명해 보세요.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="statCard">
+      <div class="small">구름 시각화</div>
+      <canvas id="cloudCanvas" class="cloudCanvas" width="420" height="300"></canvas>
+      <div class="small" style="margin-top:6px">애니메이션을 재생하면 지표면에서 공기 덩어리가 상승합니다.</div>
+    </div>
+
+    <div class="footer small">제작: 교육용 데모 · 인터랙티브 시뮬레이터</div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const deg = d => d * Math.PI / 180;
+  // controls
+  const T = document.getElementById('T');
+  const Tnum = document.getElementById('Tnum');
+  const Td = document.getElementById('Td');
+  const Tdnum = document.getElementById('Tdnum');
+  const envSliders = document.getElementById('envSliders');
+  const resetBtn = document.getElementById('resetProfile');
+  const updateBtn = document.getElementById('updateBtn');
+  const animateBtn = document.getElementById('animateBtn');
+  
+  const lclVal = document.getElementById('lclVal');
+  const stabilityEl = document.getElementById('stability');
+  const studentLCLInput = document.getElementById('studentLCL');
+  const studentLCLTempInput = document.getElementById('studentLCLTemp');
+  const saveStudentAnswerBtn = document.getElementById('saveStudentAnswer');
+  const feedbackTitle = document.getElementById('feedbackTitle');
+  const feedbackText = document.getElementById('feedbackText');
+  const feedbackList = document.getElementById('feedbackList');
+  const selfRevisionInput = document.getElementById('selfRevisionInput');
+  const revisionSummary = document.getElementById('revisionSummary');
+  const saveRevisionBtn = document.getElementById('saveRevisionBtn');
+  const resetRevisionBtn = document.getElementById('resetRevisionBtn');
+  const tabs = document.querySelectorAll('.tab');
+  const tabPanels = document.querySelectorAll('.tabPanel');
+
+  // default ambient temps (°C) at 0,1k,2k,3k,4k
+  let envTemps = [30,24,18,12,6];
+  let studentAnswer = { lcl: 1250, temp: 17.5 };
+
+  function makeEnvControls(){
+    envSliders.innerHTML = '';
+    [0,1000,2000,3000,4000].forEach((h,i)=>{
+      const row = document.createElement('div');
+      row.style.display = 'flex';
+      row.style.flexDirection = 'column';
+      row.style.gap = '6px';
+      const lab = document.createElement('label');
+      lab.textContent = `${h} m: `;
+      lab.className = 'small';
+      const r = document.createElement('input');
+      r.type = 'range'; r.min = -20; r.max = 40; r.step = 0.5; r.value = envTemps[i];
+      r.dataset.idx = i;
+      r.style.width = '100%';
+      const n = document.createElement('input');
+      n.type = 'number'; n.min = -20; n.max = 40; n.step = 0.5; n.value = envTemps[i];
+      n.style.width = '86px';
+      n.style.marginLeft = '8px';
+      n.addEventListener('input', e=>{
+        let v = parseFloat(e.target.value);
+        envTemps[i] = Number.isFinite(v)? v : envTemps[i];
+        r.value = envTemps[i];
+        renderAll();
+      });
+      r.addEventListener('input', e=>{
+        envTemps[i] = parseFloat(e.target.value);
+        n.value = envTemps[i];
+        renderAll();
+      });
+      const wrap = document.createElement('div');
+      wrap.style.display = 'flex';
+      wrap.style.alignItems = 'center';
+      wrap.style.gap = '8px';
+      wrap.appendChild(r);
+      wrap.appendChild(n);
+      row.appendChild(lab);
+      row.appendChild(wrap);
+      envSliders.appendChild(row);
+    });
+  }
+
+  makeEnvControls();
+
+  // sync range & number
+  T.addEventListener('input', e=>{ Tnum.value = e.target.value; ensureTdLE(); renderAll(); });
+  Tnum.addEventListener('input', e=>{ let v=parseFloat(e.target.value); if(!isNaN(v)) T.value=v; ensureTdLE(); renderAll(); });
+  Td.addEventListener('input', e=>{ Tdnum.value = e.target.value; ensureTdLE(); renderAll(); });
+  Tdnum.addEventListener('input', e=>{ let v=parseFloat(e.target.value); if(!isNaN(v)) Td.value=v; ensureTdLE(); renderAll(); });
+
+  function ensureTdLE(){
+    let t = parseFloat(T.value);
+    let tdv = parseFloat(Td.value);
+    if(tdv > t){
+      Td.value = t;
+      Tdnum.value = t;
+    } else {
+      Tdnum.value = Td.value;
+    }
+    Tnum.value = T.value;
+  }
+
+  resetBtn.addEventListener('click', ()=>{
+    // reset to defaults
+    T.value = 30; Tnum.value = 30;
+    Td.value = 20; Tdnum.value = 20;
+    envTemps = [30,24,18,12,6];
+    makeEnvControls();
+    renderAll();
+  });
+
+  updateBtn.addEventListener('click', renderAll);
+
+  saveStudentAnswerBtn.addEventListener('click', () => {
+    const enteredLCL = Number(studentLCLInput.value);
+    const enteredTemp = Number(studentLCLTempInput.value);
+    if (Number.isFinite(enteredLCL) && enteredLCL >= 0) studentAnswer.lcl = enteredLCL;
+    if (Number.isFinite(enteredTemp)) studentAnswer.temp = enteredTemp;
+    renderAll();
+  });
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const target = tab.dataset.tab;
+      tabs.forEach(t => t.classList.toggle('active', t === tab));
+      tabPanels.forEach(panel => {
+        panel.classList.toggle('active', panel.id === `panel-${target}`);
+      });
+    });
+  });
+
+  saveRevisionBtn.addEventListener('click', () => {
+    const text = selfRevisionInput.value.trim();
+    if (!text) {
+      revisionSummary.textContent = '먼저 내가 틀린 이유를 적어 보세요. 계산 순서와 왜 틀렸는지 쓰면 더 잘 이해할 수 있습니다.';
+      return;
+    }
+    const result = text.length > 80
+      ? '좋아요. 자신의 오개념을 문장으로 정리했고, 이제 계산 순서를 다시 점검하는 습관을 들일 수 있습니다.'
+      : '좋아요. 자신이 틀린 부분을 찾아 다시 설명해 보았어요. 다음에는 T와 Td 차이를 먼저 계산하고 LCL 공식으로 연결해 보세요.';
+    revisionSummary.innerHTML = `${result}<br><br>나의 수정 문장:<br>${text.replace(/\n/g, '<br>')}`;
+  });
+
+  resetRevisionBtn.addEventListener('click', () => {
+    selfRevisionInput.value = '';
+    revisionSummary.textContent = '아직 수정 내용을 적지 않았습니다. 틀린 이유와 다시 계산하는 방법을 적어보세요.';
+  });
+
+  function updateFeedbackMessage(actualLCL, actualTemp){
+    const diffLCL = Math.abs((studentAnswer.lcl ?? actualLCL) - actualLCL);
+    const diffTemp = Math.abs((studentAnswer.temp ?? actualTemp) - actualTemp);
+
+    if (studentAnswer.lcl == null || studentAnswer.temp == null) {
+      feedbackTitle.textContent = '학생이 확인할 점';
+      feedbackText.textContent = 'LCL은 지표면 온도와 이슬점 차이에 따라 결정됩니다. 먼저 T와 Td의 차이를 확인하고, 건조 단열선이 포화 상태에 도달하는 지점을 찾으세요.';
+      feedbackList.innerHTML = [
+        '<li>지표면 온도 T와 이슬점 Td의 차이를 계산해 보세요.</li>',
+        '<li>LCL은 보통 125 × (T - Td) m로 구합니다.</li>',
+        '<li>LCL 아래는 건조 단열선, 위에는 습윤 단열선을 적용합니다.</li>',
+        '<li>오답이 나왔다면, 어느 단계에서 계산이 틀렸는지 순서대로 다시 확인해 보세요.</li>'
+      ].join('');
+      return;
+    }
+
+    if (diffLCL > 50 || diffTemp > 0.5) {
+      feedbackTitle.textContent = '오답 원인 찾기';
+      feedbackText.textContent = `학생 답은 LCL 높이 ${studentAnswer.lcl} m, 온도 ${studentAnswer.temp.toFixed(1)}°C이고, 정답은 ${Math.round(actualLCL)} m, ${actualTemp.toFixed(1)}°C입니다. 보통 T와 Td의 차이 계산이 잘못되었는지 확인해 보세요.`;
+      feedbackList.innerHTML = [
+        '<li>지표면 기온과 이슬점 차이 T - Td가 맞는지 확인하세요.</li>',
+        '<li>LCL 공식은 125 × (T - Td) m입니다. 단위와 계산 순서를 다시 보세요.</li>',
+        '<li>건조 단열선이 포화 상태에 도달하는 지점이 LCL입니다.</li>',
+        '<li>여기서부터는 습윤 단열선을 적용해야 합니다.</li>'
+      ].join('');
+      return;
+    }
+
+    feedbackTitle.textContent = '좋은 답입니다';
+    feedbackText.textContent = 'LCL의 위치와 온도 계산이 맞습니다. 이 계산 과정을 설명할 수 있으면 더 잘 이해한 것입니다.';
+    feedbackList.innerHTML = [
+      '<li>T와 Td의 차이를 정확히 계산했습니다.</li>',
+      '<li>LCL의 의미를 판단했습니다.</li>',
+      '<li>건조 단열선에서 포화가 시작되는 지점을 잘 찾았습니다.</li>',
+      '<li>이제 다음 단계인 대기 안정도 판정도 함께 설명해 보세요.</li>'
+    ].join('');
+  }
+
+  // Canvas setup
+  const canvas = document.getElementById('skewCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width;
+  const H = canvas.height;
+  const margin = {left:72,right:18,top:18,bottom:34};
+
+  const cloudCanvas = document.getElementById('cloudCanvas');
+  const cctx = cloudCanvas.getContext('2d');
+
+  // coordinate transforms
+  const Tmin = -20, Tmax = 40;
+  const Zmin = 0, Zmax = 4000, baseZmax = 4000;
+  function xFromTemp(Tval){
+    const px = margin.left + ( (Tval - Tmin) / (Tmax - Tmin) ) * (W - margin.left - margin.right);
+    return px;
+  }
+  // map height to canvas y with 0m at bottom and increasing upward
+  function yFromZ(z){
+    const innerH = (H - margin.top - margin.bottom);
+    const frac = (z - Zmin) / (Zmax - Zmin);
+    return margin.top + innerH * (1 - frac);
+  }
+
+  // math helpers
+  const dryRate = 10; // °C/km
+  const moistRate = 5; // °C/km
+  const dewpointRateBelow = 2; // °C/km below LCL
+  const dewpointRateAbove = moistRate; // per spec
+  function calcLCL_m(Ts, Tds){
+    // H(m) = 125 * (T - Td)
+    return Math.max(0, 125 * (Ts - Tds));
+  }
+
+  function interpEnv(z){
+    // linear interp between given envTemps at 0,1k,2k,3k,4k
+    const levels = [0,1000,2000,3000,4000];
+    if(z <= 0) return envTemps[0];
+    if(z >= 4000) return envTemps[4];
+    for(let i=0;i<levels.length-1;i++){
+      if(z >= levels[i] && z <= levels[i+1]){
+        const t1 = envTemps[i], t2 = envTemps[i+1];
+        const f = (z - levels[i]) / (levels[i+1] - levels[i]);
+        return t1 + f * (t2 - t1);
+      }
+    }
+    return envTemps[4];
+  }
+
+  function buildProfiles(){
+    // compute parcel temp and dewpoint vs height in 50m steps (bottom->top)
+    const Ts = parseFloat(T.value);
+    const Tds = parseFloat(Td.value);
+    const LCL = calcLCL_m(Ts, Tds);
+    const dz = 50;
+    const pts = [];
+    let Tparcel = Ts;
+    let Tdew = Tds;
+    const plotZmax = Math.max(baseZmax, Math.ceil((LCL + 150) / 50) * 50);
+    for(let z=0; z<=plotZmax; z+=dz){
+      if(z <= LCL){
+        // dry adiabatic until LCL
+        Tparcel = Ts - (dryRate * (z/1000));
+        Tdew = Tds - (dewpointRateBelow * (z/1000));
+      } else {
+        const zAbove = z - LCL;
+        const T_atLCL = Ts - (dryRate * (LCL/1000));
+        // moist rate above LCL
+        Tparcel = T_atLCL - (moistRate * (zAbove/1000));
+        // dewpoint decreases at moist rate above LCL
+        const Td_atLCL = Tds - (dewpointRateBelow * (LCL/1000));
+        Tdew = Td_atLCL - (dewpointRateAbove * (zAbove/1000));
+      }
+      pts.push({z, Tparcel, Tdew, Tenv: interpEnv(z)});
+    }
+    return {pts, LCL};
+  }
+
+  function averageAmbientLapse(){
+    // (Tsurface - T4000)/4 km in °C/km
+    const Ts = interpEnv(0);
+    const T4 = interpEnv(4000);
+    return (Ts - T4) / 4.0;
+  }
+
+  function judgeStability(){
+    const ambLR = averageAmbientLapse();
+    if(ambLR < moistRate - 1e-6) return '절대 안정';
+    if(ambLR > dryRate + 1e-6) return '절대 불안정';
+    return '조건부 불안정';
+  }
+
+  function renderAxes(){
+    // background clear
+    ctx.clearRect(0,0,W,H);
+    // grid
+    ctx.fillStyle = 'rgba(255,255,255,0.02)';
+    ctx.fillRect(0,0,W,H);
+    // vertical lines (temperatures)
+    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for(let t=Tmin; t<=Tmax; t+=10){
+      const x = xFromTemp(t);
+      ctx.moveTo(x, margin.top);
+      ctx.lineTo(x, H - margin.bottom);
+    }
+    ctx.stroke();
+    // horizontal lines (height) — draw every 50 m, label every 500 m
+    ctx.beginPath();
+    for(let z=0; z<=Zmax; z+=50){
+      const y = yFromZ(z);
+      ctx.moveTo(margin.left, y);
+      ctx.lineTo(W - margin.right, y);
+    }
+    ctx.stroke();
+
+    // axis labels
+    ctx.fillStyle = '#111827';
+    ctx.font = '12px Inter, sans-serif';
+    // temps on top
+    for(let t=Tmin; t<=Tmax; t+=10){
+      const x = xFromTemp(t);
+      ctx.fillText(t+'°', x-10, margin.top-2);
+    }
+    // heights on left (label every 500 m to avoid clutter)
+    for(let z=0; z<=Zmax; z+=500){
+      const y = yFromZ(z);
+      ctx.fillText(z+' m', 6, y+4);
+    }
+
+    // border
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    ctx.strokeRect(margin.left, margin.top, W - margin.left - margin.right, H - margin.top - margin.bottom);
+  }
+
+  function drawEnvLine(){
+    // ambient temperature profile (user input) — dark line for contrast on light background
+    ctx.lineWidth = 3.8;
+    ctx.strokeStyle = '#111827';
+    ctx.beginPath();
+    for(let z=0; z<=Zmax; z+=50){
+      const t = interpEnv(z);
+      const x = xFromTemp(t);
+      const y = yFromZ(z);
+      if(z===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+  }
+
+  function drawDewpointLine(profiles){
+    // plot dewpoint profile in green using computed Tdew
+    ctx.lineWidth = 2.2;
+    ctx.strokeStyle = '#27ae60';
+    ctx.beginPath();
+    const pts = profiles.pts;
+    for(let i=0;i<pts.length;i++){
+      const p = pts[i];
+      const x = xFromTemp(p.Tdew);
+      const y = yFromZ(p.z);
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+  }
+
+  function drawParcelAndAdiabats(profiles){
+    // draw dry adiabat (orange) and moist adiabat (blue) following parcel path
+    const pts = profiles.pts;
+    const LCL = profiles.LCL;
+    // dry segment (red)
+    ctx.lineWidth = 2.2;
+    ctx.strokeStyle = 'red';
+    ctx.beginPath();
+    for(let i=0;i<pts.length;i++){
+      const p = pts[i];
+      if(p.z <= LCL){
+        const x = xFromTemp(p.Tparcel);
+        const y = yFromZ(p.z);
+        if(p.z===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+      }
+    }
+    ctx.stroke();
+
+    // moist segment (blue)
+    ctx.lineWidth = 2.2;
+    ctx.strokeStyle = 'blue';
+    ctx.beginPath();
+    let started=false;
+    for(let i=0;i<pts.length;i++){
+      const p=pts[i];
+      if(p.z >= LCL){
+        const x = xFromTemp(p.Tparcel);
+        const y = yFromZ(p.z);
+        if(!started){ ctx.moveTo(x,y); started=true; } else ctx.lineTo(x,y);
+      }
+    }
+    ctx.stroke();
+
+    // LCL horizontal dashed
+    ctx.save();
+    ctx.setLineDash([6,6]);
+    ctx.strokeStyle = 'rgba(17,24,39,0.65)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    const yl = yFromZ(LCL);
+    ctx.moveTo(margin.left, yl);
+    ctx.lineTo(W - margin.right, yl);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+
+    // label LCL
+    ctx.fillStyle = '#111827';
+    ctx.font = '12px Inter, sans-serif';
+    ctx.fillText(`LCL: ${Math.round(LCL)} m`, margin.left + 8, yl - 8);
+  }
+
+  function drawAmbientLapseRates(){
+    // draw reference slope lines for dry and moist lapse rates for visual guidance as faint lines
+    // draw a line from mid-left across using dry rate slope
+    ctx.strokeStyle = 'rgba(255,165,0,0.08)';
+    ctx.lineWidth = 1;
+    // skip complex skew; just provide faint guides (not necessary)
+  }
+
+  function renderAll(){
+    ensureTdLE();
+    const profiles = buildProfiles();
+    const LCL = profiles.LCL;
+    const pts = profiles.pts;
+    const stab = judgeStability();
+    const actualTemp = parseFloat(T.value) - dryRate * (LCL / 1000);
+    // update results
+    lclVal.textContent = `${Math.round(LCL)} m`;
+    stabilityEl.textContent = stab;
+    stabilityEl.className = 'verdict ' + (stab==='절대 안정'?'stable': (stab==='절대 불안정'?'unstable':'conditional'));
+    updateFeedbackMessage(LCL, actualTemp);
+
+    renderAxes();
+    // draw reference adiabats (parcel path), dewpoint, ambient profile
+    drawParcelAndAdiabats(profiles);
+    drawDewpointLine(profiles);
+    drawEnvLine();
+    drawEnvObsPoints();
+    // also draw ambient profile points as small dark circles for the light theme
+    ctx.fillStyle = '#111827';
+    for(let z=0; z<=Zmax; z+=1000){
+      const t = interpEnv(z);
+      ctx.beginPath();
+      ctx.arc(xFromTemp(t), yFromZ(z), 3, 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    // redraw cloud canvas to reflect new settings (but pause animation)
+    drawCloudStatic(profiles, stab);
+  }
+
+  function drawEnvObsPoints(){
+    // small markers & numeric labels at 0/1k/2k/3k/4k
+    ctx.fillStyle = '#111827';
+    ctx.font = '11px Inter, sans-serif';
+    [0,1000,2000,3000,4000].forEach(z=>{
+      const t = interpEnv(z);
+      const x = xFromTemp(t);
+      const y = yFromZ(z);
+      ctx.fillText(`${t.toFixed(1)}°C`, x + 6, y - 6);
+    });
+  }
+
+  // CLOUD ANIMATION
+  let animRequest = null;
+  function drawCloudStatic(profiles, stab){
+    // draw background scene with cloud depending on stability in static mode
+    cctx.clearRect(0,0,cloudCanvas.width,cloudCanvas.height);
+    // gradient sky
+    const g = cctx.createLinearGradient(0,0,0,cloudCanvas.height);
+    g.addColorStop(0,'#032b3f'); g.addColorStop(1,'#01212f');
+    cctx.fillStyle = g; cctx.fillRect(0,0,cloudCanvas.width,cloudCanvas.height);
+
+    // draw ground
+    cctx.fillStyle = '#06303a';
+    cctx.fillRect(0, cloudCanvas.height - 30, cloudCanvas.width, 30);
+
+    // draw static cloud hint at LCL
+    const LCL = profiles.LCL; // m
+    const yFactor = (LCL / Zmax);
+    const cy = cloudCanvas.height - 30 - Math.max(20, cloudCanvas.height * yFactor * 0.9);
+    if(stab === '절대 안정'){
+      drawThinStratus(cctx, cy);
+    } else if(stab === '절대 불안정'){
+      drawCumulusTower(cctx, cy + 40, 1);
+    } else {
+      drawThinThenTower(cctx, cy, profiles);
+    }
+  }
+
+  function drawThinStratus(ctx, cy){
+    // wide thin layer
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    for(let i=0;i<12;i++){
+      ctx.beginPath();
+      const w=cloudCanvas.width * (0.9 - i*0.05);
+      const x=(cloudCanvas.width - w)/2 - i*6;
+      ctx.ellipse(x + w/2, cy - i*5, w*0.5, 18 + i*2, 0, 0, Math.PI*2);
+      ctx.fill();
+    }
+  }
+
+  function drawCumulusTower(ctx, baseY, scale){
+    // draw several puffy blobs stacked
+    const centerX = cloudCanvas.width/2;
+    let top = baseY;
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    for(let i=0;i<6;i++){
+      const r = 30 + i*10;
+      ctx.beginPath();
+      ctx.ellipse(centerX - 40 + (i%2)*20, top - i*28, r*scale, r*0.7*scale, 0, 0, Math.PI*2);
+      ctx.fill();
+    }
+  }
+
+  function drawThinThenTower(ctx, cy, profiles){
+    // stratiform at LCL then a single tower rising where parcel becomes warmer
+    drawThinStratus(ctx, cy);
+    // find level where parcel temp > ambient after LCL
+    let towerBase = null;
+    for(let i=0;i<profiles.pts.length;i++){
+      const p = profiles.pts[i];
+      if(p.z > profiles.LCL){
+        if(p.Tparcel > p.Tenv + 0.1){
+          towerBase = p.z;
+          break;
+        }
+      }
+    }
+    if(towerBase){
+      const y = cloudCanvas.height - 30 - (towerBase / Zmax) * (cloudCanvas.height - 60);
+      drawCumulusTower(ctx, y+40, 1);
+    }
+  }
+
+  // animation: parcel rises and cloud forms
+  function animateCloud(){
+    if(animRequest) { cancelAnimationFrame(animRequest); animRequest = null; }
+    const profiles = buildProfiles();
+    const stab = judgeStability();
+    const LCL = profiles.LCL;
+    const duration = 4500; // ms to reach LCL
+    const start = performance.now();
+    const totalHeight = Zmax;
+    function step(now){
+      const t0 = (now - start);
+      cctx.clearRect(0,0,cloudCanvas.width,cloudCanvas.height);
+      // background
+      const g = cctx.createLinearGradient(0,0,0,cloudCanvas.height);
+      g.addColorStop(0,'#032b3f'); g.addColorStop(1,'#01212f');
+      cctx.fillStyle = g; cctx.fillRect(0,0,cloudCanvas.width,cloudCanvas.height);
+      // ground
+      cctx.fillStyle = '#06303a';
+      cctx.fillRect(0, cloudCanvas.height - 30, cloudCanvas.width, 30);
+
+      // compute parcel height progress
+      const progress = Math.min(1, t0 / duration);
+      const currentZ = progress * (LCL + 400); // let it go somewhat above LCL for visual
+      // draw rising parcel as a small warm-colored blob
+      const px = cloudCanvas.width/2;
+      const py = cloudCanvas.height - 30 - (currentZ / totalHeight) * (cloudCanvas.height - 60);
+      // trailing puff
+      for(let i=0;i<8;i++){
+        cctx.beginPath();
+        const r = 6 + i*4;
+        cctx.fillStyle = `rgba(255,120,90,${0.12 - i*0.012})`;
+        cctx.ellipse(px - i*6 + Math.sin((t0/200)+i)*6, py + i*6, r, r*0.6, 0,0,Math.PI*2);
+        cctx.fill();
+      }
+      // LCL marker on cloud canvas
+      const LCLy = cloudCanvas.height - 30 - (LCL / totalHeight) * (cloudCanvas.height - 60);
+      cctx.strokeStyle = 'rgba(255,255,255,0.35)';
+      cctx.setLineDash([5,5]);
+      cctx.beginPath();
+      cctx.moveTo(10, LCLy);
+      cctx.lineTo(cloudCanvas.width-10, LCLy);
+      cctx.stroke();
+      cctx.setLineDash([]);
+
+      // when currentZ >= LCL, show condensation
+      if(currentZ >= LCL){
+        if(stab === '절대 안정'){
+          drawAnimatedStratus(t0, LCLy);
+        } else if(stab === '절대 불안정'){
+          drawAnimatedCumulus(t0, LCLy);
+        } else {
+          drawAnimatedConditional(t0, LCLy, profiles, totalHeight);
+        }
+      } else {
+        // small vapor trail
+        cctx.fillStyle = 'rgba(200,230,255,0.18)';
+        cctx.beginPath();
+        cctx.ellipse(px, py-18, 28, 10, 0, 0, Math.PI*2);
+        cctx.fill();
+      }
+
+      // parcel marker
+      cctx.fillStyle = '#ffb07a';
+      cctx.beginPath();
+      cctx.arc(px, py, 8, 0, Math.PI*2);
+      cctx.fill();
+      // label height
+      cctx.fillStyle = '#dbe9f2';
+      cctx.font = '12px Inter';
+      cctx.fillText(`${Math.round(currentZ)} m`, px + 14, py + 4);
+
+      if(progress < 1 || t0 < duration + 1500){
+        animRequest = requestAnimationFrame(step);
+      } else {
+        animRequest = null;
+      }
+    }
+    animRequest = requestAnimationFrame(step);
+  }
+
+  function drawAnimatedStratus(t0, y){
+    // slowly grow wide thin layer
+    const wmax = cloudCanvas.width * 0.9;
+    const grow = Math.min(1, (t0 % 3000) / 3000);
+    cctx.fillStyle = 'rgba(255,255,255,0.9)';
+    for(let i=0;i<8;i++){
+      cctx.beginPath();
+      const w = wmax * (0.6 + 0.4*grow) - i*20;
+      const x = (cloudCanvas.width - w)/2;
+      const alpha = 0.9 - i*0.08;
+      cctx.fillStyle = `rgba(255,255,255,${alpha*0.9})`;
+      cctx.ellipse(x + w/2, y - i*4, w*0.5, 16 + i*2, 0, 0, Math.PI*2);
+      cctx.fill();
+    }
+  }
+
+  function drawAnimatedCumulus(t0, y){
+    // multiple puffs that rise and expand
+    const cx = cloudCanvas.width/2;
+    const phase = (t0/800) % 10;
+    for(let i=0;i<6;i++){
+      const r = 18 + (Math.sin((t0/300)+(i))*6);
+      const yy = y - i*24 - (Math.sin((t0/500)+i)*6);
+      cctx.fillStyle = 'rgba(255,255,255,0.95)';
+      cctx.beginPath();
+      cctx.ellipse(cx - 40 + i*18, yy, r, r*0.75, 0, 0, Math.PI*2);
+      cctx.fill();
+    }
+  }
+
+  function drawAnimatedConditional(t0, LCLy, profiles, plotZmax = baseZmax){
+    // draw thin layer at LCL, then grow cumulus where parcel becomes buoyant
+    drawAnimatedStratus(t0, LCLy);
+    let towerBase = null;
+    for(let i=0;i<profiles.pts.length;i++){
+      const p = profiles.pts[i];
+      if(p.z > profiles.LCL){
+        if(p.Tparcel > p.Tenv + 0.1){
+          towerBase = p.z; break;
+        }
+      }
+    }
+    if(towerBase){
+      const y = cloudCanvas.height - 30 - (towerBase / plotZmax) * (cloudCanvas.height - 60);
+      drawAnimatedCumulus(t0, y);
+    }
+  }
+
+  animateBtn.addEventListener('click', ()=>{
+    animateCloud();
+  });
+
+  // initial render
+  renderAll();
+
+})();
+</script>
+</body>
+</html>
